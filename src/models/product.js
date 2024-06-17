@@ -8,26 +8,30 @@ const Product = sequelize.define('Product', {
     primaryKey: true,
     autoIncrement: true
   },
-  pictures: DataTypes.STRING,
-  name: {
-    type: DataTypes.STRING,
+  name : {
+    type : DataTypes.STRING,
     allowNull: false
   },
-  quantity: {
-    type: DataTypes.INTEGER,
-    allowNull: false,
-    defaultValue: 0
-  },
+ 
   description: DataTypes.TEXT,
   price: {
     type: DataTypes.FLOAT,
     allowNull: false
-  }
+  },
+  rating: { type: DataTypes.FLOAT, defaultValue: 0 },
+	sold: { type: DataTypes.INTEGER, defaultValue: 0 },
+  reviewQuantity :{ type: DataTypes.INTEGER, defaultValue: 0 },
+	
+ 
   
    
   
 }, {
-  timestamps: false
+  timestamps: true,
+	createdAt: 'created_at',
+	updatedAt: false,
+	paranoid: true,
+	deletedAt: 'deleted_at'
 });
 
 Product.belongsTo(Category, {
@@ -36,4 +40,5 @@ Product.belongsTo(Category, {
   Category.hasMany(Product, {
 	foreignKey: { name: 'categoryID', type: DataTypes.INTEGER, allowNull: false }
   });
+ 
   module.exports=Product;

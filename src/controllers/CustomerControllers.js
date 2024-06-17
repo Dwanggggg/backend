@@ -12,6 +12,8 @@ let register = async (req, res, next) => {
     if (name === undefined) return res.status(400).send('Trường name không tồn tại');
     let phoneNumber = req.body.phoneNumber;
     if (phoneNumber === undefined) return res.status(400).send('Trường phoneNumber không tồn tại');
+    let address = req.body.address;
+    if (address === undefined) return res.status(400).send('Trường phoneNumber không tồn tại');
 
     let customer = await User.findOne({ where: { email, roleID: 2 } });
     if (customer) return res.status(409).send("Email đã tồn tại");
@@ -19,7 +21,7 @@ let register = async (req, res, next) => {
         try {
             let hashPassword = bcrypt.hashSync(password, 10);
             let newCustomer = await User.create({ email: email, password: hashPassword, roleID: 2 });
-            let newCustomerInfo = await CustomerInfo.create({ userID: newCustomer.userID, name, phoneNumber });
+            let newCustomerInfo = await CustomerInfo.create({ userID: newCustomer.userID, name, phoneNumber,address });
             return res.send({
                 customerID: newCustomer.userID,
                 email: newCustomer.email,

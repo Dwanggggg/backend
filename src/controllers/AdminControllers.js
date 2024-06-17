@@ -4,13 +4,17 @@ const User = require('../models/user');
 
 let register = async (req, res, next) => {
     let email = req.body.email;
+
     if(email === undefined) return res.status(400).send('Trường email không tồn tại');
+    // let adminRole = Role.findOne({where: {roleName: "admin"}})
     let admin = await User.findOne({ where: { email, roleID: 1 } });
+    
     if(admin) return res.status(409).send("Email đã tồn tại");
+
     else {
         try {
             let hashPassword = bcrypt.hashSync(req.body.password, 10);
-            let newAdmin = { email: email, password: hashPassword, role_id: 1 };
+            let newAdmin = { email: email, password: hashPassword, roleID: 1 };
             let createAdmin = await User.create(newAdmin);
             return res.send(createAdmin);
         } catch(err) {
@@ -19,6 +23,7 @@ let register = async (req, res, next) => {
         }
     }
 }
+
 let login = async (req, res, next) => {
     let email = req.body.email;
     if(email === undefined) return res.status(400).send('Trường email không tồn tại');
