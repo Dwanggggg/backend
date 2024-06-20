@@ -1,64 +1,142 @@
+const fs = require("fs");
+const path = require('path');
 const { Op } = require('sequelize');
 const Product = require('../models/product');
 const Category = require('../models/category');
 const Sequelize = require('sequelize');
 const ProductVariant = require('../models/productVariant')
 const ProductPicture = require('../models/productPicture');
+const uploadPicture = require('../middlewares/uploadPicture');
 
 let create = async (req, res, next) => {
-    //POST và PUT trong Create hay Update thường sẽ dùng req.body
-  let name = req.body.name;
-    if (name === null || name === undefined || name.trim() === '') {
-        return res.status(400).send('Trường name không được rỗng');
+  uploadPicture(req, res, async (err) => {
+      if (err) {
+          console.log(err);
+          return res.status(400).send(err);
+      }
+
+      // Kiểm tra các trường dữ liệu product
+      let name = req.body.name;
+      if (name === null || name === undefined || name.trim() === '') {
+          return res.status(400).send('Trường name không được rỗng');
       }
       
-    let categoryID = parseInt(req.body.categoryID);
-    if (categoryID === undefined) 
-      return res.status(400).send('Trường categoryID không tồn tại');
-    
-  
-    let price = parseFloat(req.body.price);
-    if (price === undefined) return res.status(400).send('Trường price không tồn tại');
-  
-    let description = req.body.description || '';
-   
-    
-   
-    try {
-      let newProduct = await Product.create({ name, description, categoryID, price, });
-      return res.send(newProduct);
-    } catch (err) {
-      console.log(err);
-      return res.status(500).send('Gặp lỗi khi tạo dữ liệu vui lòng thử lại');
-    }
-  }
-  let update = async (req, res, next) => {
-    let productID = req.body.productID;
-    if (productID === undefined) return res.status(400).send('Trường productID không tồn tại');
-    let name = req.body.name;
-    if (name === undefined) return res.status(400).send('Trường name không tồn tại');
-    let categoryID = req.body.categoryID;
-    if (categoryID === undefined) return res.status(400).send('Trường categoryID không tồn tại');
-    let price = parseFloat(req.body.price);
-    if (price === undefined) return res.status(400).send('Trường price không tồn tại');
-    let description = req.body.description || '';
-    
-    
-    try {
-        let category = await Category.findOne({ where: { categoryID } });
-        if (category == null) return res.status(400).send('Danh mục này không tồn tại');
-        let product = await Product.findOne({ where: { productID } });
-        if (product == null) return res.status(400).send('Sản phẩm này không tồn tại');
+      let categoryID = parseInt(req.body.categoryID);
+      if (categoryID === undefined || isNaN(categoryID)) {
+          return res.status(400).send('Trường categoryID không hợp lệ');
+      }
 
-        
-        await product.update({ name, categoryID, description,price,})
+      let price = parseFloat(req.body.price);
+      if (price === undefined || isNaN(price)) {
+          return res.status(400).send('Trường price không hợp lệ');
+      }
+      let description = req.body.description || '';
 
-        return res.send("Success")
-    } catch (err) {
-        console.log(err);
-        return res.status(500).send('Gặp lỗi khi tải dữ liệu vui lòng thử lại');
-    }
-}
+
+      try {
+          // Tạo product mới
+          let newProduct = await Product.create({ name, description, categoryID, price });
+
+          // Lấy danh sách ảnh đã tải lên từ middleware uploadImage
+          let files = req.files; 
+
+          // Xử lý các ảnh đã tải lên (nếu có)
+          if (files && files.length > 0) {
+              for (let file of files) {
+                  let data = {
+                      path: 'http://localhost:3000/static/images/' + file.filename, // Lấy filename từ middleware
+                      productID: newProduct.productID // Liên kết hình ảnh với productID
+                  };
+                  await ProductPicture.create(data);
+              }
+          }
+          return res.send(newProduct);
+
+      } catch (err) {
+          console.log(err);
+          return res.status(500).send('Gặp lỗi khi tạo dữ liệu vui lòng thử lại');
+      }
+  }); 
+};
+
+
+let update = async (req, res, next) => {
+    uploadPicture(req, res, async (err) => {
+        if (err) {
+            console.log(err);
+            return res.status(400).send(err);
+        }
+
+        // Lấy thông tin từ request body
+        let productID = parseInt(req.body.productID);
+        let name = req.body.name;
+        let categoryID = parseInt(req.body.categoryID);
+        let price = parseFloat(req.body.price);
+        let description = req.body.description || '';
+        let files = req.files;
+
+        // Kiểm tra các trường dữ liệu productID, name, categoryID, price
+        if (productID === undefined || isNaN(productID)) {
+            return res.status(400).send('Trường productID không hợp lệ');
+        }
+        if (name === undefined || name.trim() === '') {
+            return res.status(400).send('Trường name không hợp lệ');
+        }
+        if (categoryID === undefined || isNaN(categoryID)) {
+            return res.status(400).send('Trường categoryID không hợp lệ');
+        }
+        if (price === undefined || isNaN(price)) {
+            return res.status(400).send('Trường price không hợp lệ');
+        }
+
+        try {
+            // Tìm sản phẩm
+            let category = await Category.findOne({ where: { categoryID } });
+            if (category == null) return res.status(400).send('Danh mục này không tồn tại');
+            let product = await Product.findOne({
+                where: { productID: productID },
+                include: { model: ProductPicture, attributes: ['productPictureID', 'path'] }
+            });
+
+            if (!product) {
+                return res.status(400).send('Sản phẩm này không tồn tại');
+            }
+            // Xóa ảnh cũ của sản phẩm
+            const directoryPath = path.join(__basedir, 'public', 'images');
+            for (let { productPictureID, path : picturePath } of product.ProductPictures) { // Sử dụng productPictureID
+                const fileName = picturePath.slice(-40);
+                const filePath = path.join(directoryPath, fileName);
+
+                // Xóa file ảnh trên ổ đĩa
+                if (fs.existsSync(filePath)) {
+                    fs.unlinkSync(filePath);
+                }
+                // Xóa bản ghi ảnh trong database
+                await ProductPicture.destroy({ where: { productPictureID } }); // Sử dụng productPictureID
+            }
+
+            // Cập nhật thông tin sản phẩm
+            await product.update({ name, categoryID, description, price });
+
+            // Xử lý ảnh mới (nếu có)
+            if (files && files.length > 0) {
+                for (let file of files) {
+                    let fileName = file.path.slice(-40, file.path.length);
+                    let path = 'http://localhost:3000/static/images/' + fileName;
+                    await ProductPicture.create({
+                        path,
+                        productID: productID // Liên kết hình ảnh với productID
+                    });
+                }
+            }
+
+            return res.send("Success");
+        } catch (err) {
+            console.log(err);
+            return res.status(500).send('Gặp lỗi khi cập nhật dữ liệu vui lòng thử lại');
+        }
+    });
+};
 
 
 let listAdminSide = async (req, res, next) => {
@@ -67,9 +145,12 @@ let listAdminSide = async (req, res, next) => {
       include: [
           {
               model: Product, attributes: ['productID', 'name','price'],
+              include:[
+                { model: ProductPicture, attributes: ['path'] }
+              ]
              
           },
-          
+         
           
       ],
       order: [['created_at', 'DESC']]
@@ -79,9 +160,9 @@ let listAdminSide = async (req, res, next) => {
           productID: productVariant.Product.productID,
           productVariantID: productVariant.productVariantID,
           name: productVariant.Product.name,
-          colourName: productVariant.colour,
-          sizeName: productVariant.size,
-          
+          colour: productVariant.Colour,
+          size: productVariant.Size,
+          productPicture: productVariant.Product.ProductPictures?.[0]?.path || null,
           price: productVariant.Product.price,
           quantity: productVariant.quantity,
           
@@ -100,36 +181,81 @@ let listCustomerSide = async (req, res, next) => {
   }
 
   try {
+    // Lấy danh sách tất cả sản phẩm ưu tiên sản phẩm mới nhất
     let listProduct = await Product.findAll({
-      attributes: ['productID', 'name', 'rating', 'sold', 'price'],
+      attributes: ['productID'],
       where: whereClause,
       order: [['created_at', 'DESC']],
-      include: [
-        { model: ProductVariant, attributes: ['productVariantID'], where: { quantity: { [Op.gt]: 0 } } }, // Chỉ lấy biến thể có số lượng > 0
-        { model: Category, attributes: ['name'] }
-      ]
-    });
-   
-    listProduct = listProduct.map(product => {
-      let productVariantIDs = product.productVariants?.map(variant => variant.productVariantID) || [];
-      return {
-        productID: product.productID,
-        name: product.name,
-        rating: product.rating,
-        sold: product.sold,
-        
-        price: product.price,
-        categoryName: product.Category.name,
-        productVariantIDs: productVariantIDs // Thêm mảng productVariantIDs
-      };
+      raw: true
     });
 
-    return res.send(listProduct);
+    let listProductVariant = [];
+
+    // Duyệt qua danh sách sản phẩm
+    for (let { productID } of listProduct) {
+      // Lấy danh sách tất cả các màu của sản phẩm đó
+      let listColor = await ProductVariant.findAll({
+        attributes: ['Colour'],
+        where: { productID },
+        group: ['Colour'],
+        raw: true
+      });
+
+      // Duyệt qua danh sách màu
+      for (let { Colour } of listColor) {
+        // Tìm biến thể sản phẩm có cùng màu với nhau
+        let listProductVariantSameColour = await ProductVariant.findAll({
+          attributes: ['productVariantID', 'Colour', 'Size', 'quantity'],
+          include: [
+            {
+              model: Product, 
+              attributes: ['productID', 'name', 'rating', 'sold', 'reviewQuantity'],
+              include: {
+                 model: ProductPicture, attributes: ['path'] ,
+              },
+              where: whereClause
+            },
+            
+          ],
+          where: {
+            [Op.and]: [
+              { Colour }, // Sử dụng Colour (chuỗi) để lọc
+              
+              { quantity: { [Op.gt]: 0 } }
+            ]
+          },
+        });
+
+        // Chuyển đổi dữ liệu
+        if (listProductVariantSameColour.length) {
+          let productVariant = {
+            productID: listProductVariantSameColour[0].Product.productID,
+            productName: listProductVariantSameColour[0].Product.name,
+            rating: listProductVariantSameColour[0].Product.rating,
+            sold: listProductVariantSameColour[0].Product.sold,
+            reviewQuantity: listProductVariantSameColour[0].Product.reviewQuantity,
+            productVariantID: listProductVariantSameColour[0].productVariantID,
+            colourName: listProductVariantSameColour[0].Colour,
+            price: listProductVariantSameColour[0].Product.price,
+            productPicture: listProductVariantSameColour[0].Product.ProductPictures[0]?.path || null, 
+            sizes: []
+          };
+
+          // Duyệt qua danh sách biến thể sản phẩm có cùng màu để cộng dồn danh sách sizes
+          for (let { Size } of listProductVariantSameColour) {
+            productVariant.sizes.push(Size); 
+        }
+          listProductVariant.push(productVariant);
+        }
+      }
+    }
+
+    return res.send(listProductVariant);
   } catch (err) {
     console.log(err);
     return res.status(500).send('Gặp lỗi khi tải dữ liệu vui lòng thử lại');
   }
-}
+};
 
 let detailCustomerSide = async (req, res, next) => {
   let productID = req.params.productID;
@@ -158,16 +284,18 @@ let detailAdminSide = async (req, res, next) => {
               { model: Category, attributes: ['name'] },
               
               {
-                  model: ProductVariant, attributes: ['productVariantID', 'colour', 'size', 'quantity'],
+                  model: ProductVariant, attributes: ['productVariantID', 'Colour', 'Size', 'quantity'],
                  
-              }
+              },
+              { model: ProductPicture, attributes:['path']}
           ],
           where: { productID },
       });
 
-      if (productDetail) {
+      if (productDetail) { 
+        let productPictures = productDetail.ProductPictures.map(({ path }) => { return { path } })
           let productVariantList = productDetail.productVariants.map((productVariant) => {
-              
+            
               return {
                   productVariantID: productVariant.productVariantID,
                   
@@ -185,7 +313,8 @@ let detailAdminSide = async (req, res, next) => {
               CategoryName: productDetail.Category.name,
               price: productDetail.price,
               description: productDetail.description,
-              productVariantList: productVariantList
+              productVariantList: productVariantList,
+              productPictures: productPictures
           }
           return res.send(productDetail);
       } else {
@@ -201,19 +330,16 @@ let listColour = async (req, res, next) => {
     if (productID === undefined) {
       return res.status(400).send("Trường productID không tồn tại");
     }
-  let Size = req.params.size;
-  if (Size === undefined) {
-      return res.status(400).send("Trường productID không tồn tại");
-  }
+ 
     try {
       let listColour = await ProductVariant.findAll({
         attributes: [
-          [Sequelize.fn("DISTINCT", Sequelize.col("colour")), "colour"],
+          [Sequelize.fn("DISTINCT", Sequelize.col("Colour")), "Colour"],
         ], // Lấy danh sách các màu duy nhất
-        where: { productID,Size },
+        where: { productID },
       });
   
-      listColour = listColour.map((item) => item.get("colour")); // Chuyển đổi thành mảng các màu
+      listColour = listColour.map((item) => item.get("Colour")); // Chuyển đổi thành mảng các màu
   
       return res.send(listColour);
     } catch (err) {
@@ -223,21 +349,25 @@ let listColour = async (req, res, next) => {
   };
   
   let listSize = async (req, res, next) => {
-    let productID = req.params.productID;
-    if (productID === undefined) {
-      return res.status(400).send("Trường productID không tồn tại");
+    let productID = parseInt(req.params.productID);
+    let Colour = req.params.Colour; // Không cần parseInt vì Colour là chuỗi
+
+    if (productID === undefined || isNaN(productID)) {
+        return res.status(400).send("Trường productID không hợp lệ");
     }
-    
+    if (Colour === undefined || Colour.trim() === '') { // Kiểm tra Colour rỗng
+        return res.status(400).send("Trường Colour không hợp lệ");
+    }
   
     try {
       let listSize = await ProductVariant.findAll({
         attributes: [
-          [Sequelize.fn("DISTINCT", Sequelize.col("size")), "size"], // Lấy danh sách size duy nhất
+          [Sequelize.fn("DISTINCT", Sequelize.col("Size")), "Size"], // Lấy danh sách size duy nhất
         ],
-        where: { productID },
+        where: { productID,Colour },
       });
   
-      listSize = listSize.map((item) => item.get("size")); // Chuyển đổi thành mảng size
+      listSize = listSize.map((item) => item.get("Size")); // Chuyển đổi thành mảng size
   
       return res.send(listSize);
     } catch (err) {

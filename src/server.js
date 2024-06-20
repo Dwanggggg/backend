@@ -2,6 +2,7 @@ import express from 'express';
 import bodyParser from 'body-parser';
 import cors from 'cors';
 import setRoute from './routes/index';
+
 import { sequelize, connectDB } from './config/connectDB';
 const { createRecordsDefault } = require('./config/createRecordsDefault');
 
@@ -25,7 +26,8 @@ let port = process.env.PORT || 3000;
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(cors());
-
+global.__basedir = __dirname;
+app.use('/static', express.static('./src/public'));
 setRoute(app);
 
 (async () => {

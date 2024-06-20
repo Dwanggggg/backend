@@ -21,9 +21,9 @@ const ProductPicture = sequelize.define('ProductPicture', {
 });
 
 ProductPicture.belongsTo(Product, {
-    foreignKey: { name: 'ProductID', type: DataTypes.INTEGER, allowNull: false }
+    foreignKey: { name: 'productID', type: DataTypes.INTEGER, allowNull: false }
   });
   Product.hasMany(ProductPicture, {
-	foreignKey: { name: 'ProductID', type: DataTypes.INTEGER, allowNull: false }
+	foreignKey: { name: 'productID', type: DataTypes.INTEGER, allowNull: false }
   });
   module.exports=ProductPicture;

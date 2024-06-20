@@ -1,5 +1,6 @@
 const Product = require('../models/product');
 const ProductVariant = require('../models/productVariant');
+const ProductPicture = require('../models/productPicture')
 
 let create = async (req, res, next) => {
     
@@ -30,35 +31,7 @@ let create = async (req, res, next) => {
         }
     
 }
-let update = async (req, res, next) => {
-   
-        let productVariantID = parseInt(req.body.productVariantID);
-        if (productVariantID === undefined) return res.status(400).send('Trường productVariantID không tồn tại');
-        let quantity = parseInt(req.body.quantity);
-        if (quantity === undefined) return res.status(400).send('Trường quantity không tồn tại');
-        
 
-        try {
-            let productVariant = await ProductVariant.findOne({
-                where: { productVariantID },
-                
-            });
-            if (!productVariant) return res.status(400).send('Product Variant này không tồn tại');
-
-           
-            
-
-           
-
-            await productVariant.update({ quantity })
-
-            return res.send({ message: "Cập nhật biến thể sản phẩm thành công!" })
-        } catch (err) {
-            console.log(err);
-            return res.status(500).send('Gặp lỗi khi tải dữ liệu vui lòng thử lại');
-        }
-    
-}
 
   let updateQuantity = async (req, res, next) => {
     try {
@@ -112,30 +85,35 @@ let update = async (req, res, next) => {
             attributes: ['productVariantID', 'quantity'],
             include: [
                 {
-                    model: Product, attributes: ['productID','price'],
-                   
+                    model: Product,
+                    attributes: ['productID', 'price'],
+                    // Truy vấn ảnh từ Product:
+                    include: [
+                        { model: ProductPicture, attributes: ['path'] } 
+                    ]
                 },
-                
             ],
             where: { productID, Colour, Size },
         });
 
+        // Lấy danh sách ảnh của sản phẩm
+        let productPictures = productVariant.Product.ProductPictures.map(({ path }) => ({ path })); 
+
         let newProductVariant = {
             productVariantID: productVariant.productVariantID,
             price: productVariant.Product.price,
-            quantity: productVariant.quantity
+            quantity: productVariant.quantity,
+            productPictures: productPictures // Thêm vào kết quả
         };
-
-       
 
         return res.send(newProductVariant);
     } catch (err) {
         console.log(err);
         return res.status(500).send('Gặp lỗi khi tải dữ liệu vui lòng thử lại');
     }
-}
+};
 
   
   module.exports ={
-    create,update,updateQuantity,deleteProductVariant,detailCustomerSide
+    create,updateQuantity,deleteProductVariant,detailCustomerSide
   }

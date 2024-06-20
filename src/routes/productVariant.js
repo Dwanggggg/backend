@@ -7,7 +7,7 @@ let router = express.Router();
 
 router.post('/create', ProductVariantController.create);
 
-router.put('/update', ProductVariantController.update);
+
 
 
 router.put('/update-quantity', ProductVariantController.updateQuantity);

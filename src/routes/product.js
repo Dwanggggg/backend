@@ -13,8 +13,8 @@ router.get('/customer/detail/:productID', ProductController.detailCustomerSide);
 
 router.get('/admin/detail/:productID', ProductController.detailAdminSide);
 
-router.get('/customer/list-colour/:productID/:size', ProductController.listColour);
+router.get('/customer/list-colour/:productID/', ProductController.listColour);
 
-router.get('/customer/list-size/:productID', ProductController.listSize);
+router.get('/customer/list-size/:productID/:Colour', ProductController.listSize);
 
 module.exports = router;
