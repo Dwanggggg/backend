@@ -39,7 +39,7 @@ setRoute(app);
     await sequelize.query('SET FOREIGN_KEY_CHECKS = 0');
     
     // Đồng bộ hóa cơ sở dữ liệu
-    await sequelize.sync({ }); // force true để xóa và tạo lại bảng
+    await sequelize.sync({force:true }); // force true để xóa và tạo lại bảng
     
     console.log('Database synchronization successful.');
    

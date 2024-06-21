@@ -19,10 +19,17 @@ const Order = sequelize.define('Order', {
     allowNull: false
   },
   orderState: {
-    type: DataTypes.STRING, // Hoặc DataTypes.ENUM('Chờ xác nhận', 'Đang xử lý', 'Đang giao hàng', 'Đã giao hàng', 'Đã hủy')
+    type: DataTypes.ENUM(
+      'Chờ xác nhận',
+      'Đã xác nhận',
+      'Đang giao hàng',
+      'Đã giao',
+      'Đã hủy',
+      'Hủy bởi Shop'
+    ),
+    defaultValue: 'Chờ xác nhận',
     allowNull: false,
-    defaultValue: 'Chờ xác nhận' // Trạng thái mặc định khi tạo đơn hàng
-},
+  },
   totalProductValue: { type: DataTypes.INTEGER, allowNull: false },
 	deliveryCharges: { type: DataTypes.INTEGER, allowNull: false },
 	totalOrderValue: { type: DataTypes.INTEGER, allowNull: false },

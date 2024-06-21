@@ -115,7 +115,7 @@ let updateOrderState = async (req, res, next) => {
     try {
         let orderList = await Order.findAll({
             attributes: ['orderID', 'totalOrderValue','orderState'],
-            
+            where:{orderState:'Chờ xác nhận'},
         });
 
         orderList = orderList.map((order) => {
