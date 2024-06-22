@@ -11,7 +11,7 @@ const Review = require('../models/review');
 
 
 let create = async (req, res, next) => {
-    let userID = req.body.userID;
+    let userID = req.session.customerID;
     if (userID === undefined) return res.status(400).send('Trường userID không tồn tại');
     try {
         let user = await User.findOne({ where: { userID, roleID: 2 } });
@@ -78,10 +78,10 @@ let create = async (req, res, next) => {
            let newProductVariantQuantity = productVariant.quantity - orderItem.quantity;
             await productVariant.update({ quantity: newProductVariantQuantity });
             totalProductValue += totalValue;
-            await Product.increment('sold', { 
-                by: orderItem.quantity, 
-                where: { productID: productVariant.productID } 
-              });
+            ////await Product.increment('sold', { 
+               // by: orderItem.quantity, 
+               //where: { productID: productVariant.productID } 
+             // });
         }
          
         let deliveryCharges = 20000
@@ -94,23 +94,49 @@ let create = async (req, res, next) => {
         return res.status(500).send('Gặp lỗi khi tạo đơn hàng vui lòng thử lại');
     }
 }
-let updateOrderState = async (req, res, next) => {
-    try {
-        let orderID = req.params.orderID;
-        if (orderID === undefined) return res.status(400).send('Trường orderID không tồn tại');
-        let newOrderState = req.body.orderState;
-        if (newOrderState === undefined) return res.status(400).send('Trường OrderState không tồn tại');
+let changeStatus = async (req, res, next) => {
+    let orderID = req.params.orderID;
+    if (!orderID) return res.status(400).send('Trường orderID không tồn tại');
   
-        await Order.update(
-            { orderState: newOrderState },
-            { where: { orderID: orderID } }
-        )
-        return res.send({ message: 'Cập nhật trạng thái đơn hàng thành công!' })
+    let newState = req.params.newState;
+    if (!newState) return res.status(400).send('Trường newState không tồn tại');
+  
+    const validStateTransitions = {
+      "Chờ xác nhận": ["Đã xác nhận", "Đã hủy"],
+      "Đã xác nhận": ["Đang giao hàng", "Đã hủy"],
+      "Đang giao hàng": ["Đã giao", "Đã hủy"],
+      // "Đã giao", "Đã hủy" là các trạng thái cuối, không thể chuyển đi
+    };
+  
+    try {
+      let order = await Order.findOne({ where: { orderID } });
+      if (!order) return res.status(400).send('Order này không tồn tại');
+  
+      // Kiểm tra xem trạng thái mới có hợp lệ từ trạng thái hiện tại không
+      if (!validStateTransitions[order.orderState]?.includes(newState)) {
+        return res.status(400).send('Trạng thái chuyển đổi không hợp lệ');
+      }
+  
+      // Xử lý đặc biệt cho trạng thái "Đã giao"
+      if (newState === "Đã giao") {
+        let productVariantList = await order.getProductVariants();
+        for (let productVariant of productVariantList) {
+          let product = await productVariant.getProduct();
+          product.sold += productVariant.OrderItem.quantity;
+          await product.save();
+        }
+      }
+  
+      // Cập nhật trạng thái đơn hàng
+      order.orderState = newState;
+      await order.save();
+      return res.send(order);
     } catch (err) {
-        console.log(err)
-        return res.status(500).send('Gặp lỗi khi tải dữ liệu vui lòng thử lại');
+      console.error(err);
+      return res.status(500).send('Gặp lỗi khi xử lý đơn hàng');
     }
-  }
+  };
+  
   let listAdminSide = async (req, res, next) => {
     try {
         let orderList = await Order.findAll({
@@ -138,7 +164,7 @@ let updateOrderState = async (req, res, next) => {
     }
 }
 let listCustomerSide = async (req, res, next) => {
-    let customerID = req.params.customerID;
+    let customerID = req.session.customerID;
     if (customerID === undefined) {
         return res.status(400).send('Trường customerID không tồn tại');
     }
@@ -233,7 +259,7 @@ let listCustomerSide = async (req, res, next) => {
 }
 
 let detailCustomerSide = async (req, res, next) => {
-    let customerID = req.params.customerID;
+    let customerID = req.session.customerID;
     if (customerID === undefined) return res.status(400).send('Trường customerID không tồn tại');
 
     try {
@@ -369,6 +395,6 @@ let order;
 };
 
 module.exports = {
-    create,updateOrderState,listAdminSide,listCustomerSide,detailCustomerSide,detailAdminSide
+    create,changeStatus,listAdminSide,listCustomerSide,detailCustomerSide,detailAdminSide
    
 }

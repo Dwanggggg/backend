@@ -25,7 +25,7 @@ const Order = sequelize.define('Order', {
       'Đang giao hàng',
       'Đã giao',
       'Đã hủy',
-      'Hủy bởi Shop'
+      
     ),
     defaultValue: 'Chờ xác nhận',
     allowNull: false,

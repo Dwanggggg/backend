@@ -2,7 +2,7 @@ import express from 'express';
 import bodyParser from 'body-parser';
 import cors from 'cors';
 import setRoute from './routes/index';
-
+const session = require('express-session');
 import { sequelize, connectDB } from './config/connectDB';
 const { createRecordsDefault } = require('./config/createRecordsDefault');
 
@@ -28,6 +28,11 @@ app.use(bodyParser.urlencoded({ extended: true }));
 app.use(cors());
 global.__basedir = __dirname;
 app.use('/static', express.static('./src/public'));
+app.use(session({
+  secret: 'your_secret_key',  // Thay bằng một chuỗi bí mật an toàn
+  resave: false,
+  saveUninitialized: false,
+}));
 setRoute(app);
 
 (async () => {
@@ -39,7 +44,7 @@ setRoute(app);
     await sequelize.query('SET FOREIGN_KEY_CHECKS = 0');
     
     // Đồng bộ hóa cơ sở dữ liệu
-    await sequelize.sync({force:true }); // force true để xóa và tạo lại bảng
+    await sequelize.sync({ }); // force true để xóa và tạo lại bảng
     
     console.log('Database synchronization successful.');
    

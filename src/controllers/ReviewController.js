@@ -15,15 +15,17 @@ const Review = require('../models/review');
 
 const create = async (req, res, next) => {
     try {
-        const { customerID, productID, rating, comment } = req.body;
+      let customerID = req.session.customerID;
+    if (customerID === undefined) return res.status(400).send('Trường customerID không tồn tại');
+        const {  productID, rating, comment } = req.body;
 
         // Kiểm tra các trường bắt buộc
-        if (!customerID || !productID || !rating) {
+        if (  !productID || !rating) {
             return res.status(400).send('Thiếu thông tin bắt buộc');
         }
 
         // Kiểm tra customer
-        const customer = await User.findOne({ where: { userID: customerID, roleID: 2 } });
+        const customer = await User.findOne({ where: { userID:customerID, roleID: 2 } });
         if (!customer) return res.status(400).send('Customer không tồn tại');
 
         // Kiểm tra product
@@ -31,12 +33,12 @@ const create = async (req, res, next) => {
         if (!product) return res.status(400).send('Product không tồn tại');
 
         // Kiểm tra review đã tồn tại
-        const existingReview = await Review.findOne({ where: { userID: customerID, productID } });
+        const existingReview = await Review.findOne({ where: { userID:customerID, productID } });
         if (existingReview) return res.status(400).send('Review đã tồn tại');
 
         // Kiểm tra đơn hàng hợp lệ (đã giao và có sản phẩm)
         const order = await Order.findOne({
-            where: { userID: customerID, orderState: 'Đã giao' },
+            where: { userID:customerID, orderState: 'Đã giao' },
             include: [
                 {
                     model: OrderItem,
@@ -59,7 +61,7 @@ const create = async (req, res, next) => {
         
         // Tạo review mới
         const review = await Review.create({
-            userID: customerID,
+            userID:customerID,
             productID,
             rating, 
             comment
@@ -90,8 +92,8 @@ let update = async (req, res, next) => {
     if (reviewID === undefined) return res.status(400).send('Trường reviewID không tồn tại');
     let rating = req.body.rating;
     if (rating === undefined) return res.status(400).send('Trường rating không tồn tại');
-    let comment = req.body.comment;
-    if (comment === undefined) return res.status(400).send('Trường comment không tồn tại');
+    let comment = req.body.comment || '';
+    
 
     try {
         let review = await Review.findOne({ where: { reviewID } })
@@ -123,7 +125,7 @@ let update = async (req, res, next) => {
     }
 }
 let detail = async (req, res, next) => {
-    let customerID = req.params.customerID;
+    let customerID = req.session.customerID;
     if (customerID === undefined) return res.status(400).send('Trường customerID không tồn tại');
     let productID = req.params.productID;
     if (productID === undefined) return res.status(400).send('Trường productID không tồn tại');
